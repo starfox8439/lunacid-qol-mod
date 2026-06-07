@@ -22,10 +22,10 @@ namespace LunacidQoLMod
         internal static ManualLogSource Log           = null!;
         internal static CanvasGroup?    HudCanvasGroup;
 
-        internal static ConfigEntry<float>  HudAlpha         = null!;
-        internal static ConfigEntry<bool>   UltrawideFix     = null!;
-        internal static ConfigEntry<bool>   RespawnOnDeath   = null!;
-        internal static ConfigEntry<bool>   JumpDuringAttack = null!;
+        internal static ConfigEntry<float>  HudAlpha          = null!;
+        internal static ConfigEntry<bool>   UltrawideFix      = null!;
+        internal static ConfigEntry<bool>   RespawnOnDeath    = null!;
+        internal static ConfigEntry<bool>   JumpDuringAttack  = null!;
         internal static ConfigEntry<string> InputOverridePath = null!;
 
         private void Awake()
@@ -58,37 +58,81 @@ namespace LunacidQoLMod
             Log.LogInfo($"{PluginName} {PluginVersion} loaded.");
         }
 
-        // ── HUD canvas helpers ────────────────────────────────────────────────────
+        // ── HUD canvas group ──────────────────────────────────────────────────────
 
-        internal static void ApplyHudAlpha()
+        internal static void ApplyHudAlpha(Menus? menus = null)
         {
             if (HudCanvasGroup == null)
-                HudCanvasGroup = FindHudCanvasGroup();
+                HudCanvasGroup = menus != null ? FindHudGroupFromMenus(menus) : FindHudGroupFallback();
             if (HudCanvasGroup != null)
                 HudCanvasGroup.alpha = HudAlpha.Value;
         }
 
-        internal static CanvasGroup? FindHudCanvasGroup()
+        // Find the specific MENUS[] panel that is the HUD, without using a
+        // positional index. Priority: name match → parents a Slider → canvas root.
+        internal static CanvasGroup? FindHudGroupFromMenus(Menus menus)
         {
-            // Search by canvas name first
+            if (menus.MENUS != null)
+            {
+                // 1. Name heuristic
+                foreach (var go in menus.MENUS)
+                {
+                    if (go == null) continue;
+                    if (go.name.IndexOf("HUD", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        Log.LogInfo($"HUD panel found by name: {go.name}");
+                        return go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
+                    }
+                }
+
+                // 2. Find the MENUS element that parents any of the HP/MP sliders
+                if (menus.Sliders != null)
+                {
+                    foreach (var go in menus.MENUS)
+                    {
+                        if (go == null) continue;
+                        foreach (var slider in menus.Sliders)
+                        {
+                            if (slider != null && ((Component)slider).transform.IsChildOf(go.transform))
+                            {
+                                Log.LogInfo($"HUD panel found via Slider parent: {go.name}");
+                                return go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Last resort: canvas that parents the first HP/MP slider
+            if (menus.Sliders?.Length > 0 && menus.Sliders[0] != null)
+            {
+                var canvas = ((Component)menus.Sliders[0]).GetComponentInParent<Canvas>();
+                if (canvas != null)
+                {
+                    Log.LogInfo($"HUD canvas found via Slider root: {canvas.name}");
+                    return canvas.gameObject.GetComponent<CanvasGroup>() ?? canvas.gameObject.AddComponent<CanvasGroup>();
+                }
+            }
+
+            Log.LogWarning("HUD CanvasGroup not found.");
+            return null;
+        }
+
+        // Generic fallback used by Update/SET when no Menus instance is handy.
+        internal static CanvasGroup? FindHudGroupFallback()
+        {
             foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
             {
                 if (canvas.name.IndexOf("HUD", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return GetOrAddCanvasGroup(canvas.gameObject);
+                    return canvas.gameObject.GetComponent<CanvasGroup>() ?? canvas.gameObject.AddComponent<CanvasGroup>();
             }
-            // Fallback: first canvas that contains a Slider (health/stamina bars)
             foreach (var slider in UnityEngine.Object.FindObjectsOfType<Slider>())
             {
                 var canvas = slider.GetComponentInParent<Canvas>();
                 if (canvas != null)
-                    return GetOrAddCanvasGroup(canvas.gameObject);
+                    return canvas.gameObject.GetComponent<CanvasGroup>() ?? canvas.gameObject.AddComponent<CanvasGroup>();
             }
             return null;
-        }
-
-        private static CanvasGroup GetOrAddCanvasGroup(GameObject go)
-        {
-            return go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
         }
 
         // ── Ultrawide helpers ─────────────────────────────────────────────────────
@@ -106,10 +150,23 @@ namespace LunacidQoLMod
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
         }
+
+        internal static void ApplyUltrawideCanvasScaling()
+        {
+            if (!IsUltrawide()) return;
+            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
+            {
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler == null || scaler.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) continue;
+                // Match height so the canvas expands horizontally on ultrawide —
+                // same as the original mod: matchWidthOrHeight=1, MatchWidthOrHeight mode.
+                scaler.screenMatchMode    = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = 1f;
+            }
+        }
     }
 
     // ─── Patch 1: Respawn on death ────────────────────────────────────────────────
-    // Skips the death screen and reloads the current scene instead.
 
     [HarmonyPatch(typeof(Player_Control_scr), "Die")]
     static class Patch_PlayerDie
@@ -119,18 +176,13 @@ namespace LunacidQoLMod
         {
             if (!Plugin.RespawnOnDeath.Value) return true;
 
-            // Clear death state so the game doesn't treat the player as dead
-            // after the scene reloads.
             Traverse.Create(__instance).Field("ded").SetValue(false);
-
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             return false;
         }
     }
 
     // ─── Patch 2: Allow jumping while attacking ───────────────────────────────────
-    // Clears the Freeze flag before NawJump checks it, so the jump is never blocked
-    // by an ongoing weapon-attack animation.
 
     [HarmonyPatch(typeof(Player_Control_scr), "NawJump")]
     static class Patch_NawJump
@@ -144,8 +196,6 @@ namespace LunacidQoLMod
     }
 
     // ─── Patch 3: Fix AspectRatioFitter on screen-flash overlay ──────────────────
-    // The flash GO has an AspectRatioFitter that clamps it to 16:9 on ultra-wide;
-    // we disable it and anchor the rect to fill the full screen instead.
 
     [HarmonyPatch(typeof(Flash_scr), "Flash")]
     static class Patch_FlashAspect
@@ -154,64 +204,59 @@ namespace LunacidQoLMod
         static void Prefix(Flash_scr __instance)
         {
             if (!Plugin.IsUltrawide()) return;
-
             var rt = __instance.GetComponent<RectTransform>();
-            if (rt != null)
-                Plugin.StretchRect(rt, __instance.gameObject);
+            if (rt != null) Plugin.StretchRect(rt, __instance.gameObject);
         }
     }
 
-    // ─── Patch 4: HUD transparency + ultrawide canvas scaling on scene load ───────
-    // Runs after LoadMenu so every new scene has correct alpha and canvas scale mode.
+    // ─── Patch 4: HUD transparency + ultrawide on Menus.Awake ────────────────────
+    // Awake is where the original mod applied settings; serialized fields
+    // (MENUS, Sliders) are already populated by Unity before Awake runs.
+
+    [HarmonyPatch(typeof(Menus), "Awake")]
+    static class Patch_MenusAwake
+    {
+        [HarmonyPostfix]
+        static void Postfix(Menus __instance)
+        {
+            Plugin.HudCanvasGroup = null;
+            Plugin.ApplyHudAlpha(__instance);
+            Plugin.ApplyUltrawideCanvasScaling();
+        }
+    }
+
+    // ─── Patch 5: Re-apply after LoadMenu (canvas may be rebuilt) ────────────────
 
     [HarmonyPatch(typeof(Menus), "LoadMenu")]
     static class Patch_MenusLoadMenu
     {
         [HarmonyPostfix]
-        static void Postfix()
+        static void Postfix(Menus __instance)
         {
-            // Drop the cached group so we re-discover the HUD in the new scene.
-            Plugin.HudCanvasGroup = null;
-            Plugin.ApplyHudAlpha();
-            ApplyUltrawideCanvasScaling();
-        }
-
-        static void ApplyUltrawideCanvasScaling()
-        {
-            if (!Plugin.IsUltrawide()) return;
-
-            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
-            {
-                var scaler = canvas.GetComponent<CanvasScaler>();
-                if (scaler == null) continue;
-                if (scaler.uiScaleMode == CanvasScaler.ScaleMode.ScaleWithScreenSize)
-                    scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
-            }
+            Plugin.ApplyHudAlpha(__instance);
         }
     }
 
-    // ─── Patch 5: Re-apply HUD alpha every Update ─────────────────────────────────
-    // The game resets CanvasGroup.alpha each frame via its own Update loop.
+    // ─── Patch 6: Re-apply HUD alpha every Update ─────────────────────────────────
+    // Guard: game may fight the alpha value each frame.
 
     [HarmonyPatch(typeof(Menus), "Update")]
     static class Patch_MenusUpdate
     {
         [HarmonyPostfix]
-        static void Postfix() => Plugin.ApplyHudAlpha();
+        static void Postfix(Menus __instance) => Plugin.ApplyHudAlpha(__instance);
     }
 
-    // ─── Patch 6: Re-apply HUD alpha after SET calls ──────────────────────────────
+    // ─── Patch 7: Re-apply HUD alpha after SET calls ──────────────────────────────
 
     [HarmonyPatch(typeof(Menus), "SET")]
     static class Patch_MenusSET
     {
         [HarmonyPostfix]
-        static void Postfix() => Plugin.ApplyHudAlpha();
+        static void Postfix(Menus __instance) => Plugin.ApplyHudAlpha(__instance);
     }
 
-    // ─── Patch 7: Ultrawide popup text positioning ────────────────────────────────
-    // Floating damage / notification text uses positions baked for 16:9.
-    // Scale the X coordinate so it stays proportionally correct on wider displays.
+    // ─── Patch 8: Ultrawide popup text positioning ────────────────────────────────
 
     [HarmonyPatch(typeof(POP_text_scr), "POP")]
     static class Patch_PopText
@@ -220,22 +265,16 @@ namespace LunacidQoLMod
         static void Postfix(POP_text_scr __instance)
         {
             if (!Plugin.IsUltrawide()) return;
-
             var rt = __instance.GetComponent<RectTransform>();
             if (rt == null) return;
-
-            float aspect = (float)Screen.width / Screen.height;
-            // Map the 16:9 X coordinate into the actual wider canvas space.
-            float xScale = aspect / (16f / 9f);
+            float xScale = ((float)Screen.width / Screen.height) / (16f / 9f);
             var pos = rt.anchoredPosition;
             pos.x *= xScale;
             rt.anchoredPosition = pos;
         }
     }
 
-    // ─── Patch 8: Ultrawide poison overlay ───────────────────────────────────────
-    // Player_Poison.IMG is the fullscreen poison-vignette image.
-    // Remove its AspectRatioFitter and stretch to fill the screen.
+    // ─── Patch 9: Ultrawide poison overlay ───────────────────────────────────────
 
     [HarmonyPatch(typeof(Player_Poison), "Harm")]
     static class Patch_PoisonHarm
@@ -244,20 +283,14 @@ namespace LunacidQoLMod
         static void Postfix(Player_Poison __instance)
         {
             if (!Plugin.IsUltrawide()) return;
-
             var img = Traverse.Create(__instance).Field<Image>("IMG").Value;
             if (img == null) return;
-
             var rt = img.GetComponent<RectTransform>();
-            if (rt != null)
-                Plugin.StretchRect(rt, img.gameObject);
+            if (rt != null) Plugin.StretchRect(rt, img.gameObject);
         }
     }
 
-    // ─── Patches 9a / 9b: Load input override JSON via Unity InputSystem ──────────
-    // Both CONTROL and Menu_Control_scr run Start(); we hook both so the overrides
-    // are applied regardless of which initialises first. A static flag prevents
-    // double-loading.
+    // ─── Patches 10a / 10b: Load input override JSON ─────────────────────────────
 
     [HarmonyPatch(typeof(CONTROL), "Start")]
     static class Patch_ControlStart
@@ -280,23 +313,13 @@ namespace LunacidQoLMod
         internal static void TryLoad()
         {
             if (_loaded) return;
-
             var path = Plugin.InputOverridePath.Value;
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
-
             try
             {
-                var json          = File.ReadAllText(path);
-                var overrideAsset = InputActionAsset.FromJson(json);
-
                 var playerInput = UnityEngine.Object.FindObjectOfType<PlayerInput>();
                 if (playerInput?.actions == null) return;
-
-                // Replace the active asset with the override asset wholesale.
-                // The JSON is a full InputActionAsset, so swapping is the most
-                // compatible approach across InputSystem versions.
-                playerInput.actions = overrideAsset;
-
+                playerInput.actions = InputActionAsset.FromJson(File.ReadAllText(path));
                 _loaded = true;
                 Plugin.Log.LogInfo($"Input overrides loaded from: {path}");
             }
