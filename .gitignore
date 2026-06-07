@@ -17,3 +17,6 @@ BepInEx/
 
 # Compiled release artifacts (uploaded via CI)
 *.zip
+
+# Claude Code
+.claude/

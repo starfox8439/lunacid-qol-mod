@@ -6,3 +6,4 @@ regex:LUNACID_Data/Managed/UnityEngine\.UI\.dll
 regex:LUNACID_Data/Managed/Unity\.InputSystem\.dll
 regex:LUNACID_Data/Managed/Unity\.TextMeshPro\.dll
 regex:LUNACID_Data/Managed/UnityEngine\.PhysicsModule\.dll
+
