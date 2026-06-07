@@ -122,9 +122,13 @@ The `build` workflow runs a NuGet restore on every push (no credentials required
 
 ---
 
-## Contributing
+## Maintenance
 
-Pull requests are welcome. Please open an issue first for significant changes.
+This project is **not actively maintained**. No issues will be monitored or pull requests reviewed. If you want to extend or fix it, please fork the repository and carry it forward.
+
+## Credits
+
+The original Lunacid QoL mod was created by **MoArtis** — see the [original Steam discussion](https://steamcommunity.com/app/1745510/discussions/0/6333797474860240085/). This repository ports that mod to BepInEx 5 + Harmony so it works without modifying the game's DLLs.
 
 ## License
 
