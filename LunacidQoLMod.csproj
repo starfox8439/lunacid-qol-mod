@@ -1,0 +1,83 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>LunacidQoLMod</AssemblyName>
+    <RootNamespace>LunacidQoLMod</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Override with /p:GamePath=... on CI or non-default installs -->
+    <GamePath Condition="'$(GamePath)' == ''">/home/dantalian/.local/share/Steam/steamapps/common/Lunacid</GamePath>
+    <ManagedPath>$(GamePath)/LUNACID_Data/Managed</ManagedPath>
+    <BepInExCorePath>$(GamePath)/BepInEx/core</BepInExCorePath>
+    <!-- Let MSBuild resolve short assembly names from both paths -->
+    <AssemblySearchPaths>$(ManagedPath);$(BepInExCorePath);$(AssemblySearchPaths)</AssemblySearchPaths>
+  </PropertyGroup>
+
+  <!--
+    BepInEx via NuGet when BepInEx is not yet installed at the game path.
+    This covers CI runners and fresh checkouts.  The NuGet feed must be
+    present in nuget.config (see file at project root).
+  -->
+  <ItemGroup Condition="!Exists('$(BepInExCorePath)/BepInEx.dll')">
+    <PackageReference Include="BepInEx.Core" Version="5.4.23.2" />
+  </ItemGroup>
+
+  <!--
+    BepInEx from the game installation when BepInEx is already installed.
+    Using HintPath keeps the reference pointing at the exact version the
+    game loads at runtime.
+  -->
+  <ItemGroup Condition="Exists('$(BepInExCorePath)/BepInEx.dll')">
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCorePath)/BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCorePath)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Unity engine assemblies (all from LUNACID_Data/Managed/) -->
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedPath)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(ManagedPath)/UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ManagedPath)/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(ManagedPath)/Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ManagedPath)/Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(ManagedPath)/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Game assembly — local stripped copy, never committed (see .gitignore) -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(MSBuildProjectDirectory)/LUNACID_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

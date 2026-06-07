@@ -1,0 +1,8 @@
+regex:LUNACID_Data/Managed/Assembly-CSharp\.dll
+regex:LUNACID_Data/Managed/UnityEngine\.dll
+regex:LUNACID_Data/Managed/UnityEngine\.CoreModule\.dll
+regex:LUNACID_Data/Managed/UnityEngine\.UIModule\.dll
+regex:LUNACID_Data/Managed/UnityEngine\.UI\.dll
+regex:LUNACID_Data/Managed/Unity\.InputSystem\.dll
+regex:LUNACID_Data/Managed/Unity\.TextMeshPro\.dll
+regex:LUNACID_Data/Managed/UnityEngine\.PhysicsModule\.dll

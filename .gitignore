@@ -1,0 +1,19 @@
+# Build outputs
+bin/
+obj/
+
+# Visual Studio / Rider
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+# Game DLLs — do not ship copyrighted files
+# Local reference copy lives here; populate it from your own game install.
+LUNACID_Data/
+
+# BepInEx runtime — installed at the game path, not committed
+BepInEx/
+
+# Compiled release artifacts (uploaded via CI)
+*.zip
