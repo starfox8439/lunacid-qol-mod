@@ -71,13 +71,13 @@ namespace LunacidQoLMod
         internal static CanvasGroup? FindHudCanvasGroup()
         {
             // Search by canvas name first
-            foreach (var canvas in Object.FindObjectsOfType<Canvas>())
+            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
             {
                 if (canvas.name.IndexOf("HUD", StringComparison.OrdinalIgnoreCase) >= 0)
                     return GetOrAddCanvasGroup(canvas.gameObject);
             }
             // Fallback: first canvas that contains a Slider (health/stamina bars)
-            foreach (var slider in Object.FindObjectsOfType<Slider>())
+            foreach (var slider in UnityEngine.Object.FindObjectsOfType<Slider>())
             {
                 var canvas = slider.GetComponentInParent<Canvas>();
                 if (canvas != null)
@@ -180,7 +180,7 @@ namespace LunacidQoLMod
         {
             if (!Plugin.IsUltrawide()) return;
 
-            foreach (var canvas in Object.FindObjectsOfType<Canvas>())
+            foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
             {
                 var scaler = canvas.GetComponent<CanvasScaler>();
                 if (scaler == null) continue;
@@ -289,12 +289,13 @@ namespace LunacidQoLMod
                 var json          = File.ReadAllText(path);
                 var overrideAsset = InputActionAsset.FromJson(json);
 
-                var playerInput = Object.FindObjectOfType<PlayerInput>();
+                var playerInput = UnityEngine.Object.FindObjectOfType<PlayerInput>();
                 if (playerInput?.actions == null) return;
 
-                // Convert the full asset's bindings to an overrides JSON and apply.
-                playerInput.actions.LoadBindingOverridesFromJson(
-                    overrideAsset.SaveBindingOverridesAsJson());
+                // Replace the active asset with the override asset wholesale.
+                // The JSON is a full InputActionAsset, so swapping is the most
+                // compatible approach across InputSystem versions.
+                playerInput.actions = overrideAsset;
 
                 _loaded = true;
                 Plugin.Log.LogInfo($"Input overrides loaded from: {path}");
