@@ -79,7 +79,35 @@ All settings are in `BepInEx/config/crycode4650.lunacid.qolmod.cfg`. Changes tak
 |---|---|---|---|
 | `InputOverridePath` | string | *(empty)* | Absolute path to an `InputActionAsset` JSON file. Replaces the game's default bindings on startup. Leave empty to use game defaults. |
 
-A template with the vanilla bindings is included: [`LunacidQoLMod-InputOverrides.json`](LunacidQoLMod-InputOverrides.json).
+**Example — remapping Jump to `Space` and `F` on keyboard:**
+
+1. Copy [`LunacidQoLMod-InputOverrides.json`](LunacidQoLMod-InputOverrides.json) (included in this repo) somewhere on your machine, e.g. next to the game executable.
+2. Open it and find the binding you want to change. Each action has a `"bindings"` array; edit the `"path"` field to the new key using [Unity's control path syntax](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.0/manual/Controls.html):
+   ```json
+   {
+     "name": "",
+     "id": "f513b0cd-0aa0-432e-8698-1e3744d4b06c",
+     "path": "<Keyboard>/space",
+     "action": "Jump"
+   },
+   {
+     "name": "",
+     "id": "a1b2c3d4-0000-0000-0000-000000000001",
+     "path": "<Keyboard>/f",
+     "action": "Jump"
+   }
+   ```
+3. Set `InputOverridePath` in the config to the full path of your edited file:
+   ```
+   # Windows
+   InputOverridePath = C:\Users\you\Desktop\LunacidQoLMod-InputOverrides.json
+
+   # Linux
+   InputOverridePath = /home/you/LunacidQoLMod-InputOverrides.json
+   ```
+4. Launch the game — the overrides are applied on startup.
+
+Common control paths: `<Keyboard>/space`, `<Keyboard>/f`, `<Gamepad>/buttonSouth`, `<Mouse>/leftButton`. See Unity's [input control path reference](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.0/manual/Controls.html) for the full list.
 
 ---
 
