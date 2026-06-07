@@ -209,23 +209,9 @@ namespace LunacidQoLMod
         }
     }
 
-    // ─── Patch 4: HUD transparency + ultrawide on Menus.Awake ────────────────────
-    // Awake is where the original mod applied settings; serialized fields
-    // (MENUS, Sliders) are already populated by Unity before Awake runs.
-
-    [HarmonyPatch(typeof(Menus), "Awake")]
-    static class Patch_MenusAwake
-    {
-        [HarmonyPostfix]
-        static void Postfix(Menus __instance)
-        {
-            Plugin.HudCanvasGroup = null;
-            Plugin.ApplyHudAlpha(__instance);
-            Plugin.ApplyUltrawideCanvasScaling();
-        }
-    }
-
-    // ─── Patch 5: Re-apply after LoadMenu (canvas may be rebuilt) ────────────────
+    // ─── Patch 4: HUD transparency + ultrawide on LoadMenu ───────────────────────
+    // LoadMenu is called when the HUD/menu canvas is first built and on every
+    // scene transition — serialized fields (MENUS, Sliders) are live by then.
 
     [HarmonyPatch(typeof(Menus), "LoadMenu")]
     static class Patch_MenusLoadMenu
@@ -233,7 +219,9 @@ namespace LunacidQoLMod
         [HarmonyPostfix]
         static void Postfix(Menus __instance)
         {
+            Plugin.HudCanvasGroup = null;
             Plugin.ApplyHudAlpha(__instance);
+            Plugin.ApplyUltrawideCanvasScaling();
         }
     }
 
