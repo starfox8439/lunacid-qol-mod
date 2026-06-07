@@ -21,6 +21,7 @@ namespace LunacidQoLMod
         internal static Plugin          Instance      = null!;
         internal static ManualLogSource Log           = null!;
         internal static CanvasGroup?    HudCanvasGroup;
+        private static bool             _hudSearched;
 
         internal static ConfigEntry<float>  HudAlpha          = null!;
         internal static ConfigEntry<bool>   UltrawideFix      = null!;
@@ -62,10 +63,19 @@ namespace LunacidQoLMod
 
         internal static void ApplyHudAlpha(Menus? menus = null)
         {
-            if (HudCanvasGroup == null)
+            if (HudCanvasGroup == null && !_hudSearched)
+            {
+                _hudSearched = true;
                 HudCanvasGroup = menus != null ? FindHudGroupFromMenus(menus) : FindHudGroupFallback();
+            }
             if (HudCanvasGroup != null)
                 HudCanvasGroup.alpha = HudAlpha.Value;
+        }
+
+        internal static void ResetHudSearch()
+        {
+            HudCanvasGroup = null;
+            _hudSearched   = false;
         }
 
         // Find the specific MENUS[] panel that is the HUD, without using a
@@ -74,22 +84,24 @@ namespace LunacidQoLMod
         {
             if (menus.MENUS != null)
             {
-                // 1. Name heuristic
+                // 1. Exact name — Lunacid's in-game HUD panel is "GAME"
                 foreach (var go in menus.MENUS)
                 {
                     if (go == null) continue;
-                    if (go.name.IndexOf("HUD", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (go.name == "GAME" || go.name.IndexOf("HUD", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         Log.LogInfo($"HUD panel found by name: {go.name}");
                         return go.GetComponent<CanvasGroup>() ?? go.AddComponent<CanvasGroup>();
                     }
                 }
 
-                // 2. Find the MENUS element that parents any of the HP/MP sliders
+                // 2. Most-specific ancestor: iterate in reverse so inner panels
+                //    (e.g. GAME) are checked before outer roots (e.g. MAIN).
                 if (menus.Sliders != null)
                 {
-                    foreach (var go in menus.MENUS)
+                    for (int i = menus.MENUS.Length - 1; i >= 0; i--)
                     {
+                        var go = menus.MENUS[i];
                         if (go == null) continue;
                         foreach (var slider in menus.Sliders)
                         {
@@ -103,7 +115,7 @@ namespace LunacidQoLMod
                 }
             }
 
-            // 3. Last resort: canvas that parents the first HP/MP slider
+            // 3. Last resort: canvas root of the first slider
             if (menus.Sliders?.Length > 0 && menus.Sliders[0] != null)
             {
                 var canvas = ((Component)menus.Sliders[0]).GetComponentInParent<Canvas>();
@@ -219,7 +231,7 @@ namespace LunacidQoLMod
         [HarmonyPostfix]
         static void Postfix(Menus __instance)
         {
-            Plugin.HudCanvasGroup = null;
+            Plugin.ResetHudSearch();
             Plugin.ApplyHudAlpha(__instance);
             Plugin.ApplyUltrawideCanvasScaling();
         }
