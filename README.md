@@ -30,17 +30,16 @@ Lunacid ships as a Windows build and runs through Proton.
 1. Download **BepInEx 5.4.x Windows x64** from the [BepInEx releases page](https://github.com/BepInEx/BepInEx/releases).
 2. Extract into the Lunacid game folder (same as above).
 3. Drop `LunacidQoLMod.dll` into `BepInEx/plugins/`.
-4. Configure Steam to load BepInEx:
+4. Open Steam → Lunacid → **Properties → General → Launch Options** and add the appropriate line for your Proton version:
 
-   | Proton version | Required setup |
+   | Proton version | Launch option |
    |---|---|
-   | **CachyOS Proton** | None — loads automatically |
-   | **Proton 9, Proton Experimental, GE-Proton, others** | Set launch option (see below) |
+   | Proton 8 and earlier | `WINEDLLOVERRIDES="winhttp=n,b" %command%` |
+   | Proton 9 / Proton Experimental | `WINEDLLOVERRIDES="winhttp=n,b" %command%` |
+   | GE-Proton | `WINEDLLOVERRIDES="winhttp=n,b" %command%` |
+   | CachyOS Proton (proton-cachyos-slr) | `WINEDLLOVERRIDES="winhttp=n,b" %command%` |
 
-   For all non-CachyOS Proton builds, open Steam → Lunacid → **Properties → General → Launch Options** and add:
-   ```
-   WINEDLLOVERRIDES="winhttp=n,b" %command%
-   ```
+   If you are unsure which version you are on, the line `WINEDLLOVERRIDES="winhttp=n,b" %command%` works across all current Proton releases. `n,b` means *native first, fall back to builtin* — it tells Wine to load the `winhttp.dll` shipped with BepInEx rather than its own built-in implementation.
 
 Default game path on Linux:
 ```
